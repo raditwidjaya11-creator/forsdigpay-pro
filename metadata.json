@@ -1,0 +1,6 @@
+{
+  "name": "Forsdigpay",
+  "description": "Premium PPOB platform for multi-operator pulse, data packages, bills, and more. Features include real-time balance, multi-tier referral, and admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["PPOB Payments", "Digital Wallet", "JWT Authentication", "Admin Dashboard", "AI Chatbot Assistant", "Real-time Transactions"]
+}
