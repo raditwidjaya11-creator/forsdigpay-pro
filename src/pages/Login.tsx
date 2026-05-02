@@ -1,7 +1,33 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.js';
-import api from '../utils/api.js';
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    // ambil user dari Supabase
+    login(data.session.access_token, data.user);
+
+    navigate('/');
+  } catch (err: any) {
+    setError(err.message || 'Gagal masuk. Periksa email & password.');
+  } finally {
+    setLoading(false);
+  }
+};
 import { motion } from 'motion/react';
 
 export default function Login() {
