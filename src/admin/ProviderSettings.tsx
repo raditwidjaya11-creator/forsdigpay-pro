@@ -154,9 +154,12 @@ export default function ProviderSettings({ onBack }: { onBack: () => void }) {
                        </label>
                        <input 
                           type={f.type || 'text'}
-                          value={(formData as any)[f.key]}
+                          value={((formData as any)[f.key]) === 0 && !isNaN((formData as any)[f.key]) ? 0 : (formData as any)[f.key] || ''}
                           required
-                          onChange={e => setFormData({ ...formData, [f.key]: f.type === 'number' ? parseInt(e.target.value) : e.target.value })}
+                          onChange={e => {
+                             const val = e.target.value;
+                             setFormData({ ...formData, [f.key]: f.type === 'number' ? (val === '' ? 0 : parseInt(val) || 0) : val });
+                          }}
                           className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-3.5 px-5 text-sm focus:border-indigo-500 focus:bg-white transition-all outline-none"
                           placeholder={f.placeholder}
                        />

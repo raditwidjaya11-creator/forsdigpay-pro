@@ -69,11 +69,18 @@ export default function History() {
               </div>
               <div className="text-right">
                 <p className={`text-base font-black ${t.productId ? 'text-slate-900' : 'text-emerald-600'}`}>
-                  {t.productId ? '-' : '+'} Rp {t.amount.toLocaleString('id-ID')}
+                  {t.productId ? '-' : '+'} Rp {t?.amount?.toLocaleString('id-ID')}
                 </p>
-                <div className="flex items-center justify-end gap-1.5 mt-1.5 px-2 py-0.5 rounded-full w-fit ml-auto border bg-emerald-50 border-emerald-100">
-                   <CheckCircle2 size={10} className="text-emerald-500" />
-                   <span className="text-[9px] text-emerald-600 font-black uppercase tracking-wider">Success</span>
+                <div className={`flex items-center justify-end gap-1.5 mt-1.5 px-2 py-0.5 rounded-full w-fit ml-auto border ${
+                  t.status === 'SUCCESS' ? 'bg-emerald-50 border-emerald-100' : 
+                  t.status === 'FAILED' ? 'bg-rose-50 border-rose-100' : 'bg-amber-50 border-amber-100'
+                }`}>
+                   {t.status === 'SUCCESS' ? <CheckCircle2 size={10} className="text-emerald-500" /> : 
+                    t.status === 'FAILED' ? <X size={10} className="text-rose-500" /> : <Clock size={10} className="text-amber-500" />}
+                   <span className={`text-[9px] font-black uppercase tracking-wider ${
+                     t.status === 'SUCCESS' ? 'text-emerald-600' : 
+                     t.status === 'FAILED' ? 'text-rose-600' : 'text-amber-600'
+                   }`}>{t.status === 'SUCCESS' ? 'Success' : t.status === 'FAILED' ? 'Gagal' : 'Pending'}</span>
                 </div>
               </div>
             </motion.div>
@@ -104,8 +111,22 @@ export default function History() {
                   </div>
                   <h3 className="text-xl font-black text-slate-800 tracking-tight">{selectedTx.productName || 'Topup Saldo'}</h3>
                   <div className="flex items-center justify-center gap-2 mt-1">
-                    <CheckCircle2 size={14} className="text-emerald-500" />
-                    <span className="text-xs font-black text-emerald-600 uppercase tracking-widest">Transaksi Berhasil</span>
+                    {selectedTx.status === 'SUCCESS' ? (
+                      <>
+                        <CheckCircle2 size={14} className="text-emerald-500" />
+                        <span className="text-xs font-black text-emerald-600 uppercase tracking-widest">Transaksi Berhasil</span>
+                      </>
+                    ) : selectedTx.status === 'FAILED' ? (
+                      <>
+                        <X size={14} className="text-rose-500" />
+                        <span className="text-xs font-black text-rose-600 uppercase tracking-widest">Transaksi Gagal</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={14} className="text-amber-500" />
+                        <span className="text-xs font-black text-amber-600 uppercase tracking-widest">Menunggu</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -126,6 +147,14 @@ export default function History() {
                     <span className="text-xs font-bold text-slate-700">{format(new Date(selectedTx.createdAt), 'dd MMMM yyyy, HH:mm')}</span>
                   </div>
 
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <ShoppingBag size={14} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Jenis</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-700">{selectedTx.type === 'TOPUP' ? 'Isi Saldo' : 'Pembelian Produk'}</span>
+                  </div>
+
                   {selectedTx.target && (
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2 text-slate-400">
@@ -141,7 +170,7 @@ export default function History() {
                       <Wallet size={16} strokeWidth={2.5} />
                       <span className="text-xs font-black uppercase tracking-widest">Total Bayar</span>
                     </div>
-                    <span className="text-lg font-black text-slate-900">Rp {selectedTx.amount.toLocaleString('id-ID')}</span>
+                    <span className="text-lg font-black text-slate-900">Rp {selectedTx?.amount?.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 

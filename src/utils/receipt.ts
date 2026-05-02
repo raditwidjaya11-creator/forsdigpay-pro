@@ -44,7 +44,7 @@ export const generateReceipt = (transaction: any) => {
 
   addField('ID Transaksi:', transaction.id.toUpperCase());
   addField('Waktu:', format(new Date(transaction.createdAt), 'dd/MM/yyyy HH:mm'));
-  addField('Tipe:', transaction.productId ? 'Pembelian' : 'Topup Saldo');
+  addField('Tipe:', transaction.type === 'TOPUP' ? 'Isi Saldo' : 'Pembelian');
   
   if (transaction.productName) {
     addField('Produk:', transaction.productName);
@@ -61,12 +61,12 @@ export const generateReceipt = (transaction: any) => {
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text('TOTAL:', margin, y);
-  doc.text(`Rp ${transaction.amount.toLocaleString('id-ID')}`, 70, y, { align: 'right' });
+  doc.text(`Rp ${transaction?.amount?.toLocaleString('id-ID')}`, 70, y, { align: 'right' });
 
   y += 10;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
-  doc.text('Status: BERHASIL', 40, y, { align: 'center' });
+  doc.text(`Status: ${transaction.status === 'SUCCESS' ? 'BERHASIL' : transaction.status === 'FAILED' ? 'GAGAL' : 'PENDING'}`, 40, y, { align: 'center' });
 
   y += 15;
   doc.setFont('helvetica', 'normal');

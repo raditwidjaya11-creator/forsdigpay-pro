@@ -66,7 +66,7 @@ export default function Dashboard() {
       {/* Top Header */}
       <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-lg font-extrabold tracking-tight text-slate-800">Halo, {user?.name.split(' ')[0]}!</h1>
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-800">Halo, {user?.name?.split(' ')?.[0] || 'User'}!</h1>
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Mitra Premium Gold</p>
@@ -78,7 +78,7 @@ export default function Dashboard() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-600 rounded-full border-2 border-white"></span>
           </div>
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md">
-            {user?.name[0].toUpperCase()}
+            {user?.name?.[0]?.toUpperCase() || 'U'}
           </div>
         </div>
       </div>
@@ -95,7 +95,7 @@ export default function Dashboard() {
           </div>
           <div className="flex-1">
             <h4 className="text-sm font-black text-amber-900 uppercase tracking-tight">Saldo Hampir Habis!</h4>
-            <p className="text-[11px] text-amber-700 font-bold leading-tight">Saldo Anda Rp {user.balance.toLocaleString('id-ID')}, segera isi saldo agar transaksi tetap lancar.</p>
+            <p className="text-[11px] text-amber-700 font-bold leading-tight">Saldo Anda Rp {user?.balance?.toLocaleString('id-ID')}, segera isi saldo agar transaksi tetap lancar.</p>
           </div>
           <button 
             onClick={() => window.location.href = '/wallet'}
@@ -115,7 +115,7 @@ export default function Dashboard() {
         <div className="absolute -right-4 -bottom-4 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         <div className="relative z-10">
           <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Saldo Tersedia</p>
-          <h2 className="text-3xl font-extrabold mb-6 tracking-tight">Rp {user?.balance.toLocaleString('id-ID')}</h2>
+          <h2 className="text-3xl font-extrabold mb-6 tracking-tight">Rp {user?.balance?.toLocaleString('id-ID') || '0'}</h2>
           <div className="grid grid-cols-2 gap-4">
              <button className="flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-2xl py-3 px-4 text-xs font-bold transition-all active:scale-95 shadow-sm border border-white/10">
                 <Plus size={16} /> Isi Saldo
@@ -171,7 +171,7 @@ export default function Dashboard() {
                    </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-base font-black text-indigo-600">Rp {p.price.toLocaleString('id-ID')}</p>
+                  <p className="text-base font-black text-indigo-600">Rp {p?.price?.toLocaleString('id-ID')}</p>
                   <p className="text-[9px] text-slate-400 font-bold uppercase">Ready</p>
                 </div>
               </motion.button>
@@ -208,7 +208,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Harga</p>
-                  <p className="text-sm font-extrabold text-indigo-900">Rp {showProductModal.price.toLocaleString('id-ID')}</p>
+                  <p className="text-sm font-extrabold text-indigo-900">Rp {showProductModal?.price?.toLocaleString('id-ID')}</p>
                 </div>
               </div>
 

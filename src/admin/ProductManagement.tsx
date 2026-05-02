@@ -37,9 +37,14 @@ export default function ProductManagement({ onBack }: { onBack: () => void }) {
   const fetchProducts = async () => {
     try {
       const { data } = await api.get('/products');
-      setProducts(data);
+      if (Array.isArray(data)) {
+        setProducts(data);
+      } else {
+        setProducts([]);
+      }
     } catch (e) {
       console.error(e);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -142,8 +147,11 @@ export default function ProductManagement({ onBack }: { onBack: () => void }) {
                       <input 
                         type="number"
                         required
-                        value={formData.price}
-                        onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })}
+                        value={formData.price === 0 && formData.price !== null && formData.price !== undefined && !isNaN(formData.price) ? 0 : formData.price || ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, price: val === '' ? 0 : parseInt(val) || 0 });
+                        }}
                         className="w-full mt-2 bg-slate-50 border-2 border-slate-100 rounded-2xl py-3.5 px-5 text-sm focus:border-indigo-500 transition-all outline-none"
                       />
                    </div>
@@ -174,7 +182,7 @@ export default function ProductManagement({ onBack }: { onBack: () => void }) {
       </AnimatePresence>
 
       <div className="grid grid-cols-1 gap-3">
-        {products.map(p => {
+        {Array.isArray(products) && products.map(p => {
           const CategoryIcon = CATEGORIES.find(c => c.id === p.category)?.icon || Package;
           return (
             <motion.div 
@@ -192,7 +200,7 @@ export default function ProductManagement({ onBack }: { onBack: () => void }) {
                        <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">{p.category}</span>
                        <span className="text-[10px] font-black text-slate-400 uppercase">{p.provider}</span>
                     </div>
-                    <p className="text-sm font-black text-emerald-600 mt-1">Rp {p.price.toLocaleString()}</p>
+                    <p className="text-sm font-black text-emerald-600 mt-1">Rp {p?.price?.toLocaleString()}</p>
                  </div>
               </div>
 

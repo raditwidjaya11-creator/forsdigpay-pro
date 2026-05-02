@@ -11,6 +11,9 @@ import AdminDashboard from './admin/AdminDashboard.js';
 import Navbar from './components/Navbar.js';
 import ChatBot from './components/ChatBot.js';
 
+import { Toaster } from 'sonner';
+import { SocketProvider } from './context/SocketContext.js';
+
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
@@ -69,9 +72,12 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <SocketProvider>
+        <Router>
+          <AppContent />
+          <Toaster position="top-right" richColors />
+        </Router>
+      </SocketProvider>
     </AuthProvider>
   );
 }

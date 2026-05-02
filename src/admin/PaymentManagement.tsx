@@ -10,6 +10,7 @@ import {
 export default function PaymentManagement({ onBack }: { onBack: () => void }) {
   const [methods, setMethods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -18,7 +19,9 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
     accountNo: '',
     accountName: '',
     status: 'ENABLED',
-    icon: 'CreditCard'
+    icon: 'CreditCard',
+    fee: 0,
+    fee_type: 'FIXED'
   });
 
   useEffect(() => {
@@ -27,10 +30,16 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
 
   const fetchMethods = async () => {
     try {
-      const { data } = await api.get('/payment-methods');
-      setMethods(data);
+      const { data } = await api.get('/admin/payment-methods');
+      if (Array.isArray(data)) {
+        setMethods(data);
+      } else {
+        console.error('Invalid payment methods data format:', data);
+        setMethods([]);
+      }
     } catch (e) {
       console.error(e);
+      setMethods([]);
     } finally {
       setLoading(false);
     }
@@ -38,19 +47,42 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.name) {
+      alert('Nama metode harus diisi');
+      return;
+    }
+    setSaving(true);
     try {
       if (editingId) {
         await api.put(`/admin/payment-methods/${editingId}`, formData);
       } else {
         await api.post('/admin/payment-methods', formData);
       }
-      fetchMethods();
+      await fetchMethods();
       setShowForm(false);
       setEditingId(null);
-      setFormData({ name: '', type: 'BANK', accountNo: '', accountName: '', status: 'ENABLED', icon: 'CreditCard' });
-    } catch (e) {
-      alert('Gagal menyimpan metode pembayaran');
+      setFormData({ name: '', type: 'BANK', accountNo: '', accountName: '', status: 'ENABLED', icon: 'CreditCard', fee: 0, fee_type: 'FIXED' });
+    } catch (e: any) {
+      console.error('Error saving payment method:', e);
+      alert(e.response?.data?.message || 'Gagal menyimpan metode pembayaran');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleEdit = (m: any) => {
+    setEditingId(m.id);
+    setFormData({
+      name: m.name,
+      type: m.type,
+      accountNo: m.accountNo,
+      accountName: m.accountName,
+      status: m.status,
+      icon: m.icon || 'CreditCard',
+      fee: m.fee || 0,
+      fee_type: m.fee_type || 'FIXED'
+    });
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -82,7 +114,11 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
         </button>
         <h2 className="font-black text-slate-800 text-lg">Metode Pembayaran</h2>
         <button 
-          onClick={() => { setShowForm(true); setEditingId(null); }}
+          onClick={() => { 
+            setFormData({ name: '', type: 'BANK', accountNo: '', accountName: '', status: 'ENABLED', icon: 'CreditCard', fee: 0, fee_type: 'FIXED' });
+            setEditingId(null); 
+            setShowForm(true); 
+          }}
           className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg hover:bg-indigo-700 transition-all active:scale-95"
         >
           <Plus size={24} />
@@ -132,21 +168,35 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
                       </select>
                    </div>
                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ikon</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tipe Biaya</label>
                       <select 
-                        value={formData.icon}
-                        onChange={e => setFormData({ ...formData, icon: e.target.value })}
-                        className="w-full mt-2 bg-slate-50 border-2 border-slate-100 rounded-2xl py-3.5 px-5 text-sm appearance-none outline-none"
+                        value={formData.fee_type}
+                        onChange={e => setFormData({ ...formData, fee_type: e.target.value })}
+                        className="w-full mt-2 bg-slate-50 border-2 border-slate-100 rounded-2xl py-3.5 px-5 text-sm appearance-none outline-none font-bold"
                       >
-                        <option value="CreditCard">Bank Card</option>
-                        <option value="QrCode">QRis</option>
-                        <option value="Smartphone">Smartphone / App</option>
-                        <option value="Building2">Building / Retail</option>
+                        <option value="FIXED">FIXED (Rp)</option>
+                        <option value="PERCENT">PERCENT (%)</option>
                       </select>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                      Biaya Admin ({formData.fee_type === 'FIXED' ? 'Rupiah' : 'Persen'})
+                   </label>
+                   <div className="relative">
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 mt-1 text-[10px] font-black text-slate-400">
+                         {formData.fee_type === 'FIXED' ? 'RP' : '%'}
+                      </span>
+                      <input 
+                        type="number" required value={formData.fee}
+                        onChange={e => setFormData({ ...formData, fee: parseFloat(e.target.value) || 0 })}
+                        className="w-full mt-2 bg-slate-50 border-2 border-slate-100 rounded-2xl py-3.5 pl-12 pr-5 text-sm font-black focus:border-indigo-500 outline-none"
+                      />
+                   </div>
+                </div>
+
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nomor Rekening / ID</label>
                       <input 
@@ -164,14 +214,55 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
                       />
                    </div>
                 </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ikon Tampilan</label>
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    {[
+                      { id: 'CreditCard', icon: CreditCard, label: 'Bank' },
+                      { id: 'QrCode', icon: QrCode, label: 'QRIS' },
+                      { id: 'Smartphone', icon: Smartphone, label: 'E-Wallet' },
+                      { id: 'Building2', icon: Building2, label: 'Retail' }
+                    ].map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: item.id })}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all ${formData.icon === item.id ? 'bg-indigo-50 border-indigo-500 scale-105 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'}`}
+                      >
+                        <item.icon size={20} className={formData.icon === item.id ? 'text-indigo-600' : 'text-slate-400'} />
+                        <span className="text-[8px] font-black uppercase tracking-tighter">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                   <div>
+                      <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest leading-none">Aktifkan Metode</p>
+                      <p className="text-[9px] text-slate-400 font-bold mt-1">Metode ini akan tampil di halaman user</p>
+                   </div>
+                   <button 
+                     type="button"
+                     onClick={() => setFormData({ ...formData, status: formData.status === 'ENABLED' ? 'DISABLED' : 'ENABLED' })}
+                     className={`p-1 rounded-full transition-all w-12 flex ${formData.status === 'ENABLED' ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}
+                   >
+                     <div className="w-5 h-5 bg-white rounded-full shadow-sm"></div>
+                   </button>
+                </div>
               </div>
 
               <button 
                 type="submit"
-                className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                disabled={saving}
+                className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save size={20} />
-                Simpan Metode Pembayaran
+                {saving ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Save size={20} />
+                )}
+                {editingId ? 'Simpan Perubahan' : 'Tambah Metode Pembayaran'}
               </button>
             </form>
           </motion.div>
@@ -179,7 +270,7 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
       </AnimatePresence>
 
       <div className="grid grid-cols-1 gap-3">
-        {methods.map(m => (
+        {Array.isArray(methods) && methods.map(m => (
           <motion.div 
             layout key={m.id}
             className={`bg-white p-5 rounded-3xl border transition-all shadow-sm flex items-center justify-between ${m.status === 'ENABLED' ? 'border-slate-100 font-bold' : 'border-slate-100 opacity-50 grayscale'}`}
@@ -196,6 +287,11 @@ export default function PaymentManagement({ onBack }: { onBack: () => void }) {
                         {m.status}
                      </span>
                      <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{m.type}</span>
+                     {m.fee > 0 && (
+                       <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                         Fee: {m.fee_type === 'PERCENT' ? `${m.fee}%` : `Rp ${m.fee.toLocaleString('id-ID')}`}
+                       </span>
+                     )}
                   </div>
                </div>
             </div>
