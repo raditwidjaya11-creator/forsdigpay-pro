@@ -141,50 +141,68 @@ async function startServer() {
   app.post('/api/auth/register', async (req, res) => {
     const { name, email, password, phone, role } = req.body;
     
-    // Use Supabase
-    const { data: existingUser } = await supabase.from('users').select('id').eq('email', email).single();
-    if (existingUser) return res.status(400).json({ message: 'Email exists' });
-    
-    const userRole = role === 'admin' ? 'admin' : 'user';
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    const { data: user, error } = await supabase.from('users').insert({ 
-      id: Date.now().toString(), 
-      name, 
-      email, 
-      password: hashedPassword, 
-      phone, 
-      role: userRole, 
-      balance: userRole === 'admin' ? 1000000 : 0, 
-      created_at: new Date().toISOString() 
-    }).select('id, name, email, phone, role, balance, createdAt:created_at').single();
-
-    if (error) return res.status(500).json({ message: error.message });
-    
-    sendEmail(user.email, 'Selamat Datang di Forsdigpay!', `Halo ${user.name},\n\nTerima kasih telah mendaftar di Forsdigpay. Akun Anda telah aktif dan siap digunakan.\n\nSelamat bertransaksi!`);
-    
-    res.json({ 
-      token: jwt.sign({ id: user.id, role: user.role }, JWT_SECRET), 
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, balance: user.balance } 
-    });
+    try {
+      // Check if email exists
+      const { data: existingUser } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+      if (existingUser) return res.status(400).json({ message: 'Email sudah terdaftar. Silakan gunakan email lain.' });
+      
+      const userRole = role === 'admin' ? 'admin' : 'user';
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const { data: user, error } = await supabase.from('users').insert({ 
+        id: Date.now().toString(), 
+        name, 
+        email, 
+        password: hashedPassword, 
+        phone, 
+        role: userRole, 
+        balance: userRole === 'admin' ? 1000000 : 0, 
+        created_at: new Date().toISOString() 
+      }).select('id, name, email, phone, role, balance, createdAt:created_at').single();
+  
+      if (error) throw error;
+      
+      sendEmail(user.email, 'Selamat Datang di Forsdigpay!', `Halo ${user.name},\n\nTerima kasih telah mendaftar di Forsdigpay. Akun Anda telah aktif dan siap digunakan.\n\nSelamat bertransaksi!`);
+      
+      res.json({ 
+        token: jwt.sign({ id: user.id, role: user.role }, JWT_SECRET), 
+        user: { id: user.id, name: user.name, email: user.email, role: user.role, balance: user.balance } 
+      });
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      res.status(500).json({ message: error.message || 'Terjadi kesalahan saat mendaftar.' });
+    }
   });
 
   app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
-    const { data: user } = await supabase.from('users').select('id, name, email, password, role, balance, phone, createdAt:created_at').eq('email', email).single();
-    
-    if (!user || !(await bcrypt.compare(password, user.password))) return res.status(400).json({ message: 'Invalid credentials' });
-    
-    res.json({ 
-      token: jwt.sign({ id: user.id, role: user.role }, JWT_SECRET), 
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, balance: user.balance } 
-    });
+    try {
+      const { data: user, error } = await supabase.from('users').select('id, name, email, password, role, balance, phone, createdAt:created_at').eq('email', email).maybeSingle();
+      
+      if (error) throw error;
+      if (!user) return res.status(400).json({ message: 'Akun tidak ditemukan.' });
+      
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) return res.status(400).json({ message: 'Email atau password salah.' });
+      
+      res.json({ 
+        token: jwt.sign({ id: user.id, role: user.role }, JWT_SECRET), 
+        user: { id: user.id, name: user.name, email: user.email, role: user.role, balance: user.balance } 
+      });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: error.message || 'Terjadi kesalahan saat masuk.' });
+    }
   });
 
   app.get('/api/auth/me', authenticateToken, async (req: any, res) => {
-    const { data: user } = await supabase.from('users').select('id, name, email, password, role, balance, phone, createdAt:created_at').eq('id', req.user.id).single();
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ id: user.id, name: user.name, email: user.email, role: user.role, balance: user.balance });
+    try {
+      const { data: user, error } = await supabase.from('users').select('id, name, email, password, role, balance, phone, createdAt:created_at').eq('id', req.user.id).single();
+      if (error || !user) return res.status(404).json({ message: 'Sesi berakhir, silakan masuk kembali.' });
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, balance: user.balance });
+    } catch (error: any) {
+      res.status(401).json({ message: 'Sesi tidak valid.' });
+    }
   });
 
   app.get('/api/products', async (req, res) => {

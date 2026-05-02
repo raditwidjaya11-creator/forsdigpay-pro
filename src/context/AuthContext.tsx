@@ -53,12 +53,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('user');
-    if (saved && token) {
-      setUser(JSON.parse(saved));
-    }
-    setLoading(false);
-  }, [token]);
+    const initAuth = async () => {
+      const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem('token');
+
+      if (savedToken) {
+        setToken(savedToken);
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch (e) {
+            localStorage.removeItem('user');
+          }
+        }
+        // Always try to refresh user details to ensure session is valid and data is fresh
+        try {
+          const { data } = await api.get('/auth/me');
+          setUser(data);
+          localStorage.setItem('user', JSON.stringify(data));
+        } catch (e) {
+          console.error("Session expired or invalid");
+          logout();
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, loading, refreshUser }}>
