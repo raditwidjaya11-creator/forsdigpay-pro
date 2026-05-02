@@ -18,12 +18,15 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
   const { user, loading } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/" />;
+  
+  const isAdmin = user.role !== 'user';
+  if (adminOnly && !isAdmin) return <Navigate to="/" />;
   return <>{children}</>;
 };
 
 function AppContent() {
   const { user } = useAuth();
+  const isAdmin = user && user.role !== 'user';
   
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-indigo-100">
@@ -35,7 +38,7 @@ function AppContent() {
           
           <Route path="/" element={
             <ProtectedRoute>
-              {user?.role === 'admin' ? <AdminDashboard /> : <UserDashboard />}
+              {isAdmin ? <AdminDashboard /> : <UserDashboard />}
             </ProtectedRoute>
           } />
           

@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../utils/api.js';
 
+import { Role } from '../constants.js';
+
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'user' | 'admin';
+  role: Role;
   balance: number;
 }
 

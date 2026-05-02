@@ -84,8 +84,30 @@ async function startServer() {
     });
   };
 
+  // --- RBAC Config ---
+  const ROLES = {
+    SUPER_ADMIN: 'super_admin',
+    FINANCE_ADMIN: 'finance_admin',
+    SUPPORT_ADMIN: 'support_admin',
+    USER: 'user',
+    ADMIN_LEGACY: 'admin' // for backward compatibility
+  };
+
+  const ALL_ADMIN_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY];
+
+  const authorize = (allowedRoles: string[]) => {
+    return (req: any, res: Response, next: NextFunction) => {
+      if (!req.user || !allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ message: 'Akses ditolak: Izin tidak memadai' });
+      }
+      next();
+    };
+  };
+
   const isAdmin = (req: any, res: Response, next: NextFunction) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!req.user || !ALL_ADMIN_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
     next();
   };
 
@@ -236,7 +258,7 @@ async function startServer() {
     res.json(deposit);
   });
 
-  app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/stats', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
     const { data: users } = await supabase.from('users').select('created_at');
     const { data: txs } = await supabase.from('transactions').select('amount, created_at, product_id, status');
@@ -303,7 +325,7 @@ async function startServer() {
     });
   });
 
-  app.get('/api/admin/reports/transactions', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/reports/transactions', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { startDate, endDate, status, type } = req.query;
     let query = supabase.from('transactions').select('id, userId:user_id, productId:product_id, productName:product_name, amount, target, status, createdAt:created_at');
 
@@ -329,7 +351,7 @@ async function startServer() {
     res.json(filtered);
   });
 
-  app.post('/api/admin/reports/send', authenticateToken, isAdmin, async (req, res) => {
+  app.post('/api/admin/reports/send', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { startDate, endDate, status, type, recipientEmail, transactionCount } = req.body;
     
     sendEmail(
@@ -352,23 +374,23 @@ async function startServer() {
     res.json(report);
   });
 
-  app.get('/api/admin/reports/history', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/reports/history', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data } = await supabase.from('reports').select('id, startDate:start_date, endDate:end_date, status, type, recipientEmail:recipient_email, transactionCount:transaction_count, sentAt:sent_at').order('sent_at', { ascending: false });
     res.json(data || []);
   });
 
-  app.get('/api/admin/users/:id/transactions', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/users/:id/transactions', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data } = await supabase.from('transactions').select('id, userId:user_id, productId:product_id, productName:product_name, amount, target, status, createdAt:created_at').eq('user_id', req.params.id);
     res.json(data || []);
   });
 
   // --- Admin User Management ---
-  app.get('/api/admin/users', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/users', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data: users } = await supabase.from('users').select('id, name, email, phone, role, balance, createdAt:created_at');
     res.json(users || []);
   });
 
-  app.put('/api/admin/users/:id/balance', authenticateToken, isAdmin, async (req, res) => {
+  app.put('/api/admin/users/:id/balance', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { amount, action } = req.body; // action: 'ADD' or 'SET'
     const { data: user } = await supabase.from('users').select('*').eq('id', req.params.id).single();
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -376,6 +398,18 @@ async function startServer() {
     let newBalance = action === 'SET' ? amount : (user.balance + amount);
     await supabase.from('users').update({ balance: newBalance }).eq('id', req.params.id);
     res.json({ success: true, newBalance });
+  });
+
+  app.put('/api/admin/users/:id/role', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
+    const { role } = req.body;
+    const { data: updated, error } = await supabase.from('users')
+      .update({ role })
+      .eq('id', req.params.id)
+      .select('id, name, email, role')
+      .single();
+
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(updated);
   });
 
   // --- External Integration Support (Manual Confirmation Flow) ---
@@ -523,7 +557,7 @@ async function startServer() {
   });
 
   // --- Admin Product Management ---
-  app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => {
+  app.post('/api/admin/products', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data: product } = await supabase.from('products').insert({
       id: 'p' + Date.now(),
       ...req.body,
@@ -532,12 +566,12 @@ async function startServer() {
     res.json(product);
   });
 
-  app.put('/api/admin/products/:id', authenticateToken, isAdmin, async (req, res) => {
+  app.put('/api/admin/products/:id', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data: updated } = await supabase.from('products').update(req.body).eq('id', req.params.id).select('id, name, category, price, provider, createdAt:created_at').single();
     res.json(updated);
   });
 
-  app.delete('/api/admin/products/:id', authenticateToken, isAdmin, async (req, res) => {
+  app.delete('/api/admin/products/:id', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     await supabase.from('products').delete().eq('id', req.params.id);
     res.json({ success: true });
   });
@@ -637,12 +671,12 @@ async function startServer() {
   });
 
   // --- Admin Top Up Confirmation ---
-  app.get('/api/admin/topups', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/topups', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data } = await supabase.from('topups').select('id, userId:user_id, userName:user_name, amount, uniqueCode:unique_code, totalAmount:total_amount, paymentMethod:payment_method, status, createdAt:created_at, confirmedAt:confirmed_at, processedAt:processed_at');
     res.json(data || []);
   });
 
-  app.put('/api/admin/topups/:id/status', authenticateToken, isAdmin, async (req, res) => {
+  app.put('/api/admin/topups/:id/status', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.SUPPORT_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { status } = req.body; // 'SUCCESS' or 'REJECTED'
     const { data: topup } = await supabase.from('topups').select('*').eq('id', req.params.id).single();
     
@@ -815,7 +849,7 @@ async function startServer() {
     res.json((data || []).map(mapPaymentMethod));
   });
 
-  app.get('/api/admin/payment-methods', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/payment-methods', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data, error } = await supabase.from('payment_methods')
       .select('*')
       .order('created_at', { ascending: false });
@@ -824,7 +858,7 @@ async function startServer() {
     res.json((data || []).map(mapPaymentMethod));
   });
 
-  app.post('/api/admin/payment-methods', authenticateToken, isAdmin, async (req, res) => {
+  app.post('/api/admin/payment-methods', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { name, type, accountNo, accountName, status, icon, fee, fee_type } = req.body;
     console.log('[DEBUG] POST payment-method payload:', JSON.stringify(req.body, null, 2));
     
@@ -861,7 +895,7 @@ async function startServer() {
     res.json(data);
   });
 
-  app.put('/api/admin/payment-methods/:id', authenticateToken, isAdmin, async (req, res) => {
+  app.put('/api/admin/payment-methods/:id', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     console.log(`[DEBUG] PUT payment-method/${req.params.id} payload:`, JSON.stringify(req.body, null, 2));
     
     const { name, type, accountNo, accountName, status, icon, fee, fee_type } = req.body;
@@ -895,18 +929,18 @@ async function startServer() {
   });
 
 
-  app.delete('/api/admin/payment-methods/:id', authenticateToken, isAdmin, async (req, res) => {
+  app.delete('/api/admin/payment-methods/:id', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.FINANCE_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     await supabase.from('payment_methods').delete().eq('id', req.params.id);
     res.json({ success: true });
   });
 
   // --- Provider Management Routes ---
-  app.get('/api/admin/providers', authenticateToken, isAdmin, async (req, res) => {
+  app.get('/api/admin/providers', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { data } = await supabase.from('providers').select('id, name, url, apiKey:api_key, username, secret, priority, status, createdAt:created_at');
     res.json(data || []);
   });
 
-  app.post('/api/admin/providers', authenticateToken, isAdmin, async (req, res) => {
+  app.post('/api/admin/providers', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { name, url, apiKey, username, secret, priority, status } = req.body;
     const { data: provider, error } = await supabase.from('providers').insert({ 
       id: Date.now().toString(), 
@@ -924,7 +958,7 @@ async function startServer() {
     res.json(provider);
   });
 
-  app.put('/api/admin/providers/:id', authenticateToken, isAdmin, async (req, res) => {
+  app.put('/api/admin/providers/:id', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     const { name, url, apiKey, username, secret, priority, status } = req.body;
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
@@ -945,7 +979,7 @@ async function startServer() {
     res.json(updated);
   });
 
-  app.delete('/api/admin/providers/:id', authenticateToken, isAdmin, async (req, res) => {
+  app.delete('/api/admin/providers/:id', authenticateToken, authorize([ROLES.SUPER_ADMIN, ROLES.ADMIN_LEGACY]), async (req, res) => {
     await supabase.from('providers').delete().eq('id', req.params.id);
     res.json({ success: true });
   });

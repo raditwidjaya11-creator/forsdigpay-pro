@@ -8,13 +8,19 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+import { useAuth } from '../context/AuthContext.js';
+import { ROLES } from '../constants.js';
+
 export default function UserManagement({ onBack }: { onBack: () => void }) {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userTransactions, setUserTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+
+  const isSuperAdmin = currentUser?.role === ROLES.SUPER_ADMIN || (currentUser?.role as string) === 'admin';
 
   useEffect(() => {
     fetchUsers();
@@ -49,6 +55,26 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
       fetchUsers();
     } catch (e) {
       alert('Gagal update saldo');
+    }
+  };
+
+  const handleRoleChange = async (targetUser: any) => {
+    if (!isSuperAdmin) return;
+    const rolesList = Object.values(ROLES).join(', ');
+    const newRole = prompt(`Masukkan role baru untuk ${targetUser.name} (${rolesList}):`, targetUser.role);
+    if (!newRole || newRole === targetUser.role) return;
+    
+    if (!Object.values(ROLES).includes(newRole as any)) {
+      alert('Role tidak valid');
+      return;
+    }
+
+    try {
+      await api.put(`/admin/users/${targetUser.id}/role`, { role: newRole });
+      fetchUsers();
+      alert(`Role ${targetUser.name} berhasil diubah menjadi ${newRole}`);
+    } catch (e) {
+      alert('Gagal mengubah role');
     }
   };
 
@@ -125,21 +151,29 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
                </div>
             </div>
 
-            <div className="flex gap-2 w-full sm:w-auto">
-               <button 
-                  onClick={() => fetchUserTransactions(u)}
-                  className="flex-1 sm:flex-none py-2 px-4 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5"
-               >
-                  <History size={12} />
-                  Riwayat
-               </button>
-               <button 
-                  onClick={() => handleAdjustBalance(u.id)}
-                  className="flex-1 sm:flex-none py-2 px-4 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 hover:bg-emerald-100 transition-colors"
-               >
-                  Update Saldo
-               </button>
-            </div>
+             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <button 
+                   onClick={() => fetchUserTransactions(u)}
+                   className="flex-1 sm:flex-none py-2 px-4 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5"
+                >
+                   <History size={12} />
+                   Riwayat
+                </button>
+                <button 
+                   onClick={() => handleAdjustBalance(u.id)}
+                   className="flex-1 sm:flex-none py-2 px-4 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                >
+                   Update Saldo
+                </button>
+                {isSuperAdmin && (
+                  <button 
+                    onClick={() => handleRoleChange(u)}
+                    className="flex-1 sm:flex-none py-2 px-4 bg-purple-50 text-purple-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-100 hover:bg-purple-100 transition-colors"
+                  >
+                    Set Role
+                  </button>
+                )}
+             </div>
           </motion.div>
         ))}
       </div>
